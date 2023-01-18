@@ -1,0 +1,203 @@
+1.
+let rec smallest_divisor2 : int -> int -> int =
+  fun n divisor ->
+    if divisor * divisor > n then n
+    else if n mod divisor = 0 then divisor
+    else smallest_divisor2 n (divisor + 1)
+
+let rec smallest_divisor : int -> int =
+  fun n -> if n > 1 then smallest_divisor2 n 2 else raise (Failure "Invalid")
+;;
+
+2.
+let rec sigma : (int -> int) -> int -> int -> int =
+  fun f a b ->
+    if a > b then raise (Failure "Invalid Input")
+    else if a = b then f a
+    else f a + sigma f (a + 1) b;;
+
+3.
+let rec forall : ('a -> bool) -> 'a list -> bool =
+  fun f lst ->
+    match lst with
+      [] -> true
+    | hd :: tl -> f hd && forall f tl;;
+
+4.
+let rec is_mem : 'a -> 'a list -> bool =
+  fun e lst ->
+    match lst with
+      [] -> false
+    | hd :: tl -> hd = e || is_mem e tl
+
+let rec app_uniq : 'a list -> 'a list -> 'a list =
+  fun l1 l2 ->
+    match l1 with
+      [] -> l2
+    | hd :: tl ->
+        if is_mem hd l2 then app_uniq tl l2 else app_uniq tl (l2 @ [hd])
+    
+let rec app : 'a list -> 'a list -> 'a list =
+  fun l1 l2 -> app_uniq l1 (app_uniq l2 [])
+;;
+
+5.
+let rec remove : 'a -> 'a list -> 'a list =
+  fun e lst ->
+    match lst with
+      [] -> []
+    | hd :: tl -> if e = hd then remove e tl else hd :: remove e tl
+
+let rec uniq : 'a list -> 'a list =
+  fun lst ->
+    match lst with
+      [] -> []
+    | hd :: tl -> hd :: remove hd (uniq tl)
+
+;;
+
+6.
+let rec reduce : ('a -> 'b -> 'c -> 'c) -> 'a list -> 'b list -> 'c -> 'c =
+  fun f xs ys c ->
+    match xs, ys with
+      [], [] -> c
+    | x :: xs, y :: ys -> reduce f xs ys (f x y c)
+    | _ -> raise (Failure "Invalid Input");;
+
+7.
+type graph = (vertex * vertex) list
+and vertex = int
+
+(* Input validity checking *)
+let rec is_valid : graph * vertex -> bool =
+  fun (g, v) ->
+    match g with
+      [] -> false
+    | (s, t) :: tl -> if v = s || v = t then true else is_valid (tl, v)
+
+(* Utility function *)
+let rec mem : 'a -> 'a list -> bool =
+  fun e lst ->
+    match lst with
+      [] -> false
+    | hd :: tl -> if e = hd then true else mem e tl
+
+(* Main procedure *)
+let rec add_vertex : vertex -> vertex list -> vertex list =
+  fun v vs -> if mem v vs then vs else v :: vs
+
+let rec next : vertex list -> graph -> vertex -> vertex list =
+  fun vs g v ->
+    match g with
+      [] -> vs
+    | (s, t) :: tl ->
+        if s = v then next (add_vertex t vs) tl v else next vs tl v
+
+let rec reach_helper : vertex list -> graph -> vertex list =
+  fun vs g ->
+    let vs' = List.fold_left (fun vs v -> next vs g v) vs vs in
+    if vs = vs' then vs' else reach_helper vs' g
+
+let rec reach : graph * vertex -> vertex list =
+  fun (g, v) ->
+    if is_valid (g, v) then reach_helper [v] g
+    else raise (Failure "Invalid Input")
+;;
+
+8.
+type aexp =
+    Const of int
+  | Var of string
+  | Power of string * int
+  | Times of aexp list
+  | Sum of aexp list
+
+let rec diff : aexp * string -> aexp =
+  fun (exp, x) ->
+    match exp with
+      Const n -> Const 0
+    | Var y -> if x = y then Const 1 else Const 0
+    | Power (y, n) ->
+        if n < 0 then raise (Failure "Invalid Input")
+        else if n = 0 || x <> y then Const 0
+        else Times [Const n; Power (y, n - 1)]
+    | Times [hd] -> diff (hd, x)
+    | Times (hd :: tl) ->
+        Sum [Times (diff (hd, x) :: tl); Times [hd; diff (Times tl, x)]]
+    | Sum [hd] -> diff (hd, x)
+    | Sum (hd :: tl) -> Sum [diff (hd, x); diff (Sum tl, x)]
+    | _ -> raise (Failure "Invalid Input")
+;;
+
+9.
+type mobile = branch * branch
+and branch =
+    SimpleBranch of length * weight
+  | CompoundBranch of length * mobile
+and length = int
+and weight = int
+
+let rec compute_weight : mobile -> weight =
+  fun m ->
+    match m with
+      SimpleBranch (l1, w1), SimpleBranch (l2, w2) -> w1 + w2
+    | SimpleBranch (l1, w1), CompoundBranch (l2, m2) -> w1 + compute_weight m2
+    | CompoundBranch (l1, m1), SimpleBranch (l2, w2) -> compute_weight m1 + w2
+    | CompoundBranch (l1, m1), CompoundBranch (l2, m2) ->
+        compute_weight m1 + compute_weight m2
+    
+let rec balanced : mobile -> bool =
+  fun m ->
+    match m with
+      SimpleBranch (l1, w1), SimpleBranch (l2, w2) -> l1 * w1 = l2 * w2
+    | SimpleBranch (l1, w1), CompoundBranch (l2, m2) ->
+        if balanced m2 then l1 * w1 = l2 * compute_weight m2 else false
+    | CompoundBranch (l1, m1), SimpleBranch (l2, w2) ->
+        if balanced m1 then l1 * compute_weight m1 = l2 * w2 else false
+    | CompoundBranch (l1, m1), CompoundBranch (l2, m2) ->
+        if balanced m1 && balanced m2 then
+          l1 * compute_weight m1 = l2 * compute_weight m2
+        else false;;
+
+10.
+type exp =
+    X
+  | INT of int
+  | ADD of exp * exp
+  | SUB of exp * exp
+  | MUL of exp * exp
+  | DIV of exp * exp
+  | SIGMA of exp * exp * exp
+
+let rec apply : exp -> int -> int =
+  fun e x ->
+    match e with
+      X -> x
+    | INT n -> n
+    | ADD (e1, e2) -> apply e1 x + apply e2 x
+    | SUB (e1, e2) -> apply e1 x - apply e2 x
+    | MUL (e1, e2) -> apply e1 x * apply e2 x
+    | DIV (e1, e2) -> apply e1 x / apply e2 x
+    | SIGMA (e1, e2, e3) ->
+        let i = apply e1 x in
+        let j = apply e2 x in
+        if i > j then raise (Failure "Invalid Input")
+        else if i = j then apply e3 i
+        else apply e3 i + apply (SIGMA (ADD (e1, INT 1), e2, e3)) x
+    
+let rec calculator : exp -> int =
+  fun exp ->
+    match exp with
+      X -> raise (Failure "Invalid Input")
+    | INT n -> n
+    | ADD (e1, e2) -> calculator e1 + calculator e2
+    | SUB (e1, e2) -> calculator e1 - calculator e2
+    | MUL (e1, e2) -> calculator e1 * calculator e2
+    | DIV (e1, e2) -> calculator e1 / calculator e2
+    | SIGMA (e1, e2, e3) ->
+        let i = calculator e1 in
+        let j = calculator e2 in
+        if i > j then raise (Failure "Invalid Input")
+        else if i = j then apply e3 i
+        else apply e3 i + calculator (SIGMA (ADD (e1, INT 1), e2, e3))
+;;
